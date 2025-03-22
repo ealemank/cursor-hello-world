@@ -25,7 +25,7 @@ A simple 2D dungeon game inspired by The Legend of Zelda, built with Pygame.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/YOUR_USERNAME/cursor-hello-world.git
+git clone https://github.com/ealemank/cursor-hello-world.git
 cd cursor-hello-world
 ```
 
