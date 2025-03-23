@@ -15,8 +15,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Pygame
+# Initialize Pygame and its mixer
 pygame.init()
+pygame.mixer.init()
 
 # Constants
 WINDOW_WIDTH = 800
@@ -37,6 +38,10 @@ GRAY = (128, 128, 128)
 # Fonts
 pygame.font.init()
 FONT = pygame.font.Font(None, 36)
+
+# Sound settings
+MUSIC_VOLUME = 0.5  # 50% volume
+SOUND_VOLUME = 0.7  # 70% volume for sound effects
 
 # Load images
 def load_image(name, scale=2):
@@ -66,6 +71,20 @@ def load_image(name, scale=2):
         elif name == 'chest.png':
             surface.fill(GREEN)
         return surface
+
+def load_sound(name):
+    try:
+        logger.debug(f"Attempting to load sound: {name}")
+        sound_path = os.path.join('assets', 'sounds', name)
+        logger.debug(f"Full sound path: {sound_path}")
+        logger.debug(f"File exists: {os.path.exists(sound_path)}")
+        
+        sound = pygame.mixer.Sound(sound_path)
+        logger.info(f"Successfully loaded sound: {name}")
+        return sound
+    except Exception as e:
+        logger.error(f"Error loading sound {name}: {str(e)}")
+        return None
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -162,7 +181,9 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
         self.paused = False
+        self.music_playing = False
         self.setup_game()
+        self.setup_sound()
         logger.info("Game initialized successfully")
 
     def setup_game(self):
@@ -189,6 +210,30 @@ class Game:
         self.all_sprites.add(self.chest)
         logger.debug("Chest created and added to sprites")
 
+    def setup_sound(self):
+        # Create sounds directory if it doesn't exist
+        if not os.path.exists('assets/sounds'):
+            os.makedirs('assets/sounds')
+            
+        # Load sound effects
+        self.sword_sound = load_sound('sword_swing.mp3')
+        self.hit_sound = load_sound('enemy_hit.mp3')
+        
+        if self.sword_sound:
+            self.sword_sound.set_volume(SOUND_VOLUME)
+        if self.hit_sound:
+            self.hit_sound.set_volume(SOUND_VOLUME)
+            
+        # Load and start background music
+        try:
+            pygame.mixer.music.load(os.path.join('assets', 'sounds', 'background.mp3'))
+            pygame.mixer.music.set_volume(MUSIC_VOLUME)
+            pygame.mixer.music.play(-1)  # -1 means loop indefinitely
+            self.music_playing = True
+            logger.info("Background music started playing")
+        except Exception as e:
+            logger.error(f"Error loading background music: {str(e)}")
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -198,9 +243,23 @@ class Game:
                 if event.key == pygame.K_SPACE and not self.paused:
                     logger.debug("Space key pressed - player attacking")
                     self.player.attack()
+                    if self.sword_sound:
+                        self.sword_sound.play()
                 elif event.key == pygame.K_p:
                     self.paused = not self.paused
+                    if self.paused:
+                        pygame.mixer.music.pause()
+                    else:
+                        pygame.mixer.music.unpause()
                     logger.info(f"Game {'paused' if self.paused else 'unpaused'}")
+                elif event.key == pygame.K_m:  # Toggle music
+                    if self.music_playing:
+                        pygame.mixer.music.pause()
+                        self.music_playing = False
+                    else:
+                        pygame.mixer.music.unpause()
+                        self.music_playing = True
+                    logger.info(f"Music {'paused' if not self.music_playing else 'resumed'}")
 
         if not self.paused:
             # Get keyboard state
@@ -221,6 +280,8 @@ class Game:
                 if pygame.sprite.collide_circle(self.player, enemy):
                     enemy.health -= 25
                     logger.debug(f"Enemy hit by sword. Health: {enemy.health}")
+                    if self.hit_sound:
+                        self.hit_sound.play()
                     if enemy.health <= 0:
                         enemy.kill()
                         logger.info("Enemy defeated")
@@ -271,6 +332,10 @@ class Game:
             instruction_rect = instruction_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 40))
             self.screen.blit(instruction_text, instruction_rect)
         
+        # Draw music status
+        music_text = FONT.render("M: Music " + ("ON" if self.music_playing else "OFF"), True, WHITE)
+        self.screen.blit(music_text, (WINDOW_WIDTH - 150, 10))
+        
         pygame.display.flip()
 
     def run(self):
@@ -282,6 +347,7 @@ class Game:
             self.draw()
             self.clock.tick(60)
         logger.info("Game loop ended")
+        pygame.mixer.quit()
 
 if __name__ == "__main__":
     logger.info("Starting Zelda-like Dungeon game")
