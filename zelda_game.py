@@ -32,6 +32,11 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
+GRAY = (128, 128, 128)
+
+# Fonts
+pygame.font.init()
+FONT = pygame.font.Font(None, 36)
 
 # Load images
 def load_image(name, scale=2):
@@ -156,6 +161,7 @@ class Game:
         pygame.display.set_caption("Zelda-like Dungeon")
         self.clock = pygame.time.Clock()
         self.running = True
+        self.paused = False
         self.setup_game()
         logger.info("Game initialized successfully")
 
@@ -189,19 +195,26 @@ class Game:
                 logger.info("Quit event received")
                 self.running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_SPACE and not self.paused:
                     logger.debug("Space key pressed - player attacking")
                     self.player.attack()
+                elif event.key == pygame.K_p:
+                    self.paused = not self.paused
+                    logger.info(f"Game {'paused' if self.paused else 'unpaused'}")
 
-        # Get keyboard state
-        keys = pygame.key.get_pressed()
-        dx = keys[pygame.K_d] - keys[pygame.K_a]
-        dy = keys[pygame.K_s] - keys[pygame.K_w]
-        if dx != 0 or dy != 0:
-            logger.debug(f"Player movement: dx={dx}, dy={dy}")
-        self.player.move(dx, dy)
+        if not self.paused:
+            # Get keyboard state
+            keys = pygame.key.get_pressed()
+            dx = keys[pygame.K_d] - keys[pygame.K_a]
+            dy = keys[pygame.K_s] - keys[pygame.K_w]
+            if dx != 0 or dy != 0:
+                logger.debug(f"Player movement: dx={dx}, dy={dy}")
+            self.player.move(dx, dy)
 
     def check_collisions(self):
+        if self.paused:
+            return
+            
         # Check sword attacks
         if self.player.attacking:
             for enemy in self.enemies:
@@ -225,11 +238,12 @@ class Game:
             self.running = False
 
     def update(self):
-        self.all_sprites.update(self.player)
-        if self.player.attack_cooldown > 0:
-            self.player.attack_cooldown -= 1
-        if self.player.attack_cooldown <= 0:
-            self.player.attacking = False
+        if not self.paused:
+            self.all_sprites.update(self.player)
+            if self.player.attack_cooldown > 0:
+                self.player.attack_cooldown -= 1
+            if self.player.attack_cooldown <= 0:
+                self.player.attacking = False
 
     def draw(self):
         self.screen.fill(BLACK)
@@ -238,6 +252,24 @@ class Game:
         # Draw health bar
         pygame.draw.rect(self.screen, RED, (10, 10, 100, 20))
         pygame.draw.rect(self.screen, GREEN, (10, 10, self.player.health, 20))
+        
+        # Draw pause menu if game is paused
+        if self.paused:
+            # Create semi-transparent overlay
+            overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+            overlay.fill(BLACK)
+            overlay.set_alpha(128)
+            self.screen.blit(overlay, (0, 0))
+            
+            # Draw pause text
+            pause_text = FONT.render("PAUSED", True, WHITE)
+            text_rect = pause_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2))
+            self.screen.blit(pause_text, text_rect)
+            
+            # Draw instructions
+            instruction_text = FONT.render("Press P to continue", True, WHITE)
+            instruction_rect = instruction_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2 + 40))
+            self.screen.blit(instruction_text, instruction_rect)
         
         pygame.display.flip()
 
